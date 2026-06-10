@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>スタッフ割当LIFF</title>
+  <script src="https://d.line-scdn.net/liff/web/sdk/liff.js"></script>
+  <style>
+    :root {
+      --main: #0F6E56; --main-dark: #0B5645;
+      --accent: #2563EB;
+      --bg: #F6F8F7; --panel: #FFFFFF; --line: #E2E8F0;
+      --text: #111827; --muted: #6B7280;
+      --soft: #ECFDF5; --soft-border: #BBF7D0;
+      --soft-blue: #EFF6FF; --soft-blue-border: #D6E4FF;
+      --danger: #DC2626; --danger-soft: #FEF2F2; --danger-border: #FCA5A5;
+      --chip: #FFFFFF; --chip-on: var(--main);
+      --shadow: 0 2px 10px rgba(15, 23, 42, 0.08);
+      --header-h: 96px; --footer-h: 66px;
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { height: 100%; margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Yu Gothic", "Noto Sans JP", sans-serif;
+      color: var(--text); background: var(--bg); }
+    body { width: 100vw; min-height: 100dvh; }
+    button, input, select, textarea { font: inherit; }
+    button { touch-action: manipulation; cursor: pointer; }
+
+    .topbar { position: fixed; inset: 0 0 auto 0; z-index: 30;
+      background: rgba(255,255,255,0.97); border-bottom: 1px solid var(--line); box-shadow: var(--shadow);
+      padding: calc(7px + env(safe-area-inset-top)) 10px 8px 10px; display: grid; gap: 7px; }
+    .select-row { display: grid; grid-template-columns: 92px 1fr; gap: 7px; align-items: center; }
+    .sel { width: 100%; height: 38px; border: 1px solid var(--line); border-radius: 9px;
+      padding: 0 30px 0 10px; font-size: 13px; font-weight: 800; background: #fff; color: var(--text); }
+    .sel.case { font-weight: 900; }
+    .sel-label { font-size: 11px; font-weight: 900; color: var(--muted); text-align: right; padding-right: 2px; }
+
+    .app { padding-top: calc(var(--header-h) + env(safe-area-inset-top));
+      padding-bottom: calc(var(--footer-h) + 18px + env(safe-area-inset-bottom));
+      max-width: 760px; margin: 0 auto; }
+    .wrap { padding: 10px 11px 0; display: grid; gap: 11px; }
+
+    .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+      box-shadow: 0 1px 4px rgba(15,23,42,0.04); overflow: hidden; }
+    .card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      padding: 9px 11px; border-bottom: 1px solid var(--line); background: #fff; }
+    .card-head h2 { margin: 0; font-size: 13px; font-weight: 900; }
+    .card-body { padding: 10px 11px 12px; }
+
+    .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+    .meta-item { background: #fff; }
+    .meta-label { font-size: 10px; font-weight: 900; color: var(--muted); }
+    .meta-value { font-size: 13px; font-weight: 900; color: #0f172a; margin-top: 2px; word-break: break-word; }
+    .meta-item.full { grid-column: 1 / -1; }
+    .pos-pills { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 3px; }
+    .pos-pill { font-size: 11px; font-weight: 900; color: var(--main); background: var(--soft);
+      border: 1px solid var(--soft-border); border-radius: 999px; padding: 3px 9px; }
+
+    .assigned-list { display: grid; gap: 6px; }
+    .assigned-row { display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 7px;
+      background: #fff; border: 1px solid var(--line); border-radius: 9px; padding: 7px 9px; }
+    .assigned-meta { min-width: 0; }
+    .assigned-name { font-size: 13px; font-weight: 900; color: #0f172a; }
+    .assigned-sub { font-size: 11px; font-weight: 800; color: var(--muted); margin-top: 1px;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .assigned-pos { font-size: 11px; font-weight: 900; color: var(--main); background: var(--soft);
+      border: 1px solid var(--soft-border); border-radius: 7px; padding: 4px 8px; white-space: nowrap; }
+    .edit-btn { flex: 0 0 auto; border: 1px solid var(--soft-blue-border); background: var(--soft-blue);
+      color: var(--accent); border-radius: 8px; width: 34px; height: 32px; font-size: 14px; }
+    .del-btn { flex: 0 0 auto; border: 1px solid var(--danger-border); background: var(--danger-soft);
+      color: var(--danger); border-radius: 8px; width: 34px; height: 32px; font-size: 14px; }
+    .muted-line { font-size: 12px; font-weight: 800; color: var(--muted); padding: 4px 2px; }
+
+    .set-card { background: #fff; border: 1px solid var(--line); border-radius: 11px; padding: 10px 10px 11px;
+      margin-bottom: 9px; }
+    .set-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+    .set-title { font-size: 12px; font-weight: 900; color: #0f172a; }
+    .set-remove { border: 1px solid var(--danger-border); background: var(--danger-soft); color: var(--danger);
+      border-radius: 8px; height: 28px; padding: 0 9px; font-size: 11px; font-weight: 900; }
+    .field { display: grid; gap: 5px; margin-bottom: 9px; }
+    .field:last-child { margin-bottom: 0; }
+    .f-label { font-size: 11px; font-weight: 900; color: var(--muted); }
+    .set-sel { width: 100%; height: 38px; border: 1px solid var(--line); border-radius: 9px;
+      padding: 0 30px 0 10px; font-size: 13px; font-weight: 900; background: #fff; color: var(--text); }
+    .set-input { width: 100%; height: 40px; border: 1px solid var(--line); border-radius: 9px;
+      padding: 0 11px; font-size: 14px; font-weight: 800; background: #fff; color: var(--text); outline: none; }
+    .set-input:focus, .set-sel:focus { border-color: var(--main); box-shadow: 0 0 0 2px rgba(15,110,86,0.14); }
+
+    .date-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .date-chip { border: 1px solid var(--soft-blue-border); background: var(--soft-blue); color: #0f172a;
+      border-radius: 9px; padding: 7px 10px; font-size: 12px; font-weight: 900; }
+    .date-chip.on { background: var(--main); border-color: var(--main); color: #fff;
+      box-shadow: 0 2px 7px rgba(15,110,86,0.24); }
+    .date-chip.none { color: var(--muted); font-weight: 800; background: #fff; border-style: dashed; }
+    .chip-tools { display: flex; gap: 7px; margin-top: 7px; }
+    .chip-tool { border: 1px solid var(--line); background: #fff; color: #475569; border-radius: 8px;
+      padding: 5px 10px; font-size: 11px; font-weight: 900; }
+    .set-count { font-size: 11px; font-weight: 900; color: var(--main); margin-top: 7px; }
+
+    .add-set-btn { width: 100%; border: 1.5px dashed var(--main); background: var(--soft); color: var(--main-dark);
+      border-radius: 11px; padding: 12px; font-size: 13px; font-weight: 900; }
+
+    .footer { position: fixed; right: 0; bottom: 0; left: 0; z-index: 25;
+      height: calc(var(--footer-h) + env(safe-area-inset-bottom));
+      display: grid; grid-template-columns: 1fr; align-items: center;
+      padding: 9px 11px calc(9px + env(safe-area-inset-bottom));
+      background: rgba(255,255,255,0.97); border-top: 1px solid var(--line);
+      box-shadow: 0 -3px 12px rgba(15,23,42,0.08); max-width: 760px; margin: 0 auto; }
+    .save-btn { width: 100%; height: 100%; border: 0; border-radius: 11px; background: var(--main); color: #fff;
+      font-size: 14px; font-weight: 950; box-shadow: 0 2px 8px rgba(15,110,86,0.28); }
+    .save-btn:active { background: var(--main-dark); }
+    .save-btn:disabled { background: #CBD5E1; box-shadow: none; }
+
+    .message { position: fixed; left: 50%; bottom: calc(var(--footer-h) + 14px + env(safe-area-inset-bottom));
+      z-index: 80; transform: translateX(-50%) translateY(8px); min-width: 140px; max-width: 84vw;
+      padding: 10px 14px; border-radius: 999px; background: rgba(17,24,39,0.94); color: #fff;
+      font-size: 12px; font-weight: 900; text-align: center; opacity: 0; pointer-events: none;
+      transition: opacity 0.18s ease, transform 0.18s ease; box-shadow: 0 8px 24px rgba(15,23,42,0.24); }
+    .message.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .message.error { background: var(--danger); }
+
+    .loading { position: fixed; inset: 0; z-index: 90; display: none; align-items: center; justify-content: center; background: rgba(255,255,255,0.6); }
+    .loading.show { display: flex; }
+    .loading-box { background: #fff; padding: 16px 28px; border-radius: 12px; box-shadow: var(--shadow); font-weight: 900; }
+    .empty { padding: 40px 16px; text-align: center; color: var(--muted); font-weight: 800; font-size: 13px; line-height: 1.7; }
+
+    /* ===== 編集モーダル（LIFF①のボトムシート様式） ===== */
+    .modal-backdrop { position: fixed; inset: 0; z-index: 70; display: none; align-items: flex-end;
+      justify-content: center; background: rgba(15,23,42,0.38); padding: 12px; }
+    .modal-backdrop.show { display: flex; }
+    .modal-box { width: min(100%, 430px); max-height: min(88dvh, 620px); display: flex; flex-direction: column;
+      background: #fff; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 52px rgba(15,23,42,0.28); }
+    .modal-head { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px;
+      padding: 12px 13px 9px; border-bottom: 1px solid var(--line); }
+    .modal-title-main { font-size: 15px; font-weight: 950; line-height: 1.2; }
+    .modal-title-sub { margin-top: 2px; color: var(--muted); font-size: 11px; line-height: 1.3; font-weight: 700; }
+    .close-btn { width: 34px; height: 34px; border: 1px solid var(--line); border-radius: 999px;
+      background: #fff; color: #475569; font-size: 18px; line-height: 1; }
+    .edit-area { overflow-y: auto; padding: 12px 13px 6px; }
+    .modal-foot { border-top: 1px solid var(--line); padding: 9px 12px calc(11px + env(safe-area-inset-bottom));
+      background: #fff; display: grid; gap: 8px; }
+    .preview-box { min-height: 38px; background: var(--soft); border: 1px solid var(--soft-border);
+      border-radius: 10px; padding: 8px 9px; font-size: 12px; line-height: 1.35; font-weight: 900; color: #0f172a; }
+    .modal-actions { display: grid; grid-template-columns: 0.78fr 1fr; gap: 8px; }
+    .ghost-btn { min-height: 40px; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: #475569; font-size: 13px; font-weight: 950; }
+    .confirm-btn { min-height: 40px; border: 0; border-radius: 10px; background: var(--main); color: #fff; font-size: 13px; font-weight: 950; }
+
+    @media (max-width: 360px) {
+      .select-row { grid-template-columns: 78px 1fr; }
+      .meta-grid { grid-template-columns: 1fr; }
+    }
+    @media (min-width: 700px) {
+      .modal-backdrop { align-items: center; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="select-row">
+      <span class="sel-label">開催月</span>
+      <select id="monthSelect" class="sel" onchange="onMonthChange()"></select>
+    </div>
+    <div class="select-row">
+      <span class="sel-label">案件</span>
+      <select id="caseSelect" class="sel case" onchange="onCaseChange()"></select>
+    </div>
+  </header>
+
+  <main class="app">
+    <div class="wrap" id="wrap">
+      <div class="empty" id="emptyState">読み込み中...</div>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <button id="saveBtn" class="save-btn" type="button" onclick="saveAll()" disabled>保存して B_稼働予定 に登録</button>
+  </footer>
+
+  <div id="message" class="message" role="status"></div>
+  <div id="loading" class="loading"><div class="loading-box">処理中...</div></div>
+
+  <!-- 割当編集モーダル -->
+  <div id="editBackdrop" class="modal-backdrop">
+    <section class="modal-box" role="dialog" aria-modal="true">
+      <header class="modal-head">
+        <div>
+          <div class="modal-title-main">割当を編集</div>
+          <div class="modal-title-sub">日付・ポジション変更時は単価等を案件から再コピー</div>
+        </div>
+        <button id="editClose" class="close-btn" type="button">×</button>
+      </header>
+      <div class="edit-area">
+        <div class="field">
+          <span class="f-label">ポジション</span>
+          <select id="editPos" class="set-sel"></select>
+        </div>
+        <div class="field">
+          <span class="f-label">日付（1つ選択）</span>
+          <div id="editDates" class="date-chips"></div>
+        </div>
+        <div class="field">
+          <span class="f-label">スタッフ名</span>
+          <input id="editName" class="set-input" type="text" autocomplete="off">
+        </div>
+      </div>
+      <footer class="modal-foot">
+        <div id="editPreview" class="preview-box">—</div>
+        <div class="modal-actions">
+          <button id="editCancel" class="ghost-btn" type="button">キャンセル</button>
+          <button id="editConfirm" class="confirm-btn" type="button">更新</button>
+        </div>
+      </footer>
+    </section>
+  </div>
+
+  <script>
+    // ===== 設定 =====
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycbwrpujZnwOw98ieBUmX_D_sOYfS9QjgII_jHW2dGt3tZ9poo3rl9PHpp7Tn3baAYn6D/exec';
+    // ★ LIFF② 用に新規LIFFアプリを作ったら、そのLIFF IDに差し替えてください（暫定でLIFF①のIDを使用）
+    const LIFF_ID = '2010311386-Kap9WjxT';
+    const dayNames = ["日","月","火","水","木","金","土"];
+
+    let allCases = [];      // GASから取得した全案件
+    let viewCases = [];     // 月フィルタ後に表示中の案件
+    let currentCase = null; // 選択中の案件
+    let slotMap = {};       // `${pos}__${date}` -> slot（単価等の既定値）
+    let setSeq = 0;         // 割当セットの連番
+    let assignedCache = []; // 表示中案件の既存割当（編集用）
+
+    // ===== 日付ユーティリティ =====
+    function toDate(key){ if(!key) return null; const s=String(key).slice(0,10); const [y,m,d]=s.split('-').map(Number); if(!y||!m||!d) return null; return new Date(y,m-1,d); }
+    function todayKey(){ const d=new Date(); const y=d.getFullYear(); const m=String(d.getMonth()+1).padStart(2,'0'); const dd=String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${dd}`; }
+    function formatDateJp(key){ const date=toDate(key); if(!date) return key; const yy=String(date.getFullYear()).slice(-2); const mm=String(date.getMonth()+1).padStart(2,'0'); const dd=String(date.getDate()).padStart(2,'0'); return `${yy}/${mm}/${dd}（${dayNames[date.getDay()]}）`; }
+    function formatDateShort(key){ const date=toDate(key); if(!date) return key; const mm=date.getMonth()+1; const dd=date.getDate(); return `${mm}/${dd}（${dayNames[date.getDay()]}）`; }
+    function formatMonthJp(ym){ const [y,m]=String(ym).split('-'); return `${y}年${Number(m)}月`; }
+    function isConsecutive(keys){ if(keys.length<=1) return false; const s=[...keys].sort(); for(let i=1;i<s.length;i++){ if(Math.round((toDate(s[i])-toDate(s[i-1]))/86400000)!==1) return false; } return true; }
+    function displayDateRange(keys){ const s=[...new Set(keys)].sort(); if(s.length===0) return '未設定'; if(s.length===1) return formatDateJp(s[0]); if(isConsecutive(s)) return `${formatDateJp(s[0])}〜${formatDateJp(s[s.length-1])}（連続${s.length}日）`; return `${s.map(formatDateShort).join('・')}（飛び石${s.length}日）`; }
+    function escapeHtml(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function withComma(n){ const num=parseInt(String(n).replace(/[^0-9-]/g,''),10); if(isNaN(num)) return '0'; return num.toLocaleString('ja-JP'); }
+
+    // ===== トースト・ローディング =====
+    let toastTimer=null;
+    function showMessage(text,isError){ const el=document.getElementById('message'); el.textContent=text; el.classList.toggle('error',!!isError); el.classList.add('show'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>el.classList.remove('show'),1700); }
+    function showLoading(show){ document.getElementById('loading').classList.toggle('show',show); }
+
+    // ===== LIFF初期化＆データ取得 =====
+    async function initLiff(){
+      try{ await liff.init({liffId:LIFF_ID}); if(!liff.isLoggedIn()){ liff.login(); return; } }
+      catch(e){ console.error('LIFF init error:',e); }
+      setupEditModal();
+      loadCases();
+    }
+
+    async function loadCases(){
+      try{
+        showLoading(true);
+        const res=await fetch(GAS_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},redirect:'follow',body:JSON.stringify({action:'getCasesForAssignment'})});
+        const data=await res.json();
+        showLoading(false);
+        if(!data.success){ renderEmpty('取得エラー：'+(data.error||'不明')); return; }
+        allCases=data.cases||[];
+        // 進行中・未来のみ（最終日が今日以降）
+        const tk=todayKey();
+        allCases=allCases.filter(c=> (c.lastDate||'') >= tk);
+        if(allCases.length===0){ renderEmpty('登録済みで進行中・未来の案件がありません。\nLIFF①で案件を確定登録してください。'); document.getElementById('monthSelect').innerHTML='<option>—</option>'; document.getElementById('caseSelect').innerHTML='<option>案件なし</option>'; return; }
+        populateMonths();
+        applyMonthFilter();
+      }catch(e){ console.error('Load error:',e); showLoading(false); renderEmpty('読み込みエラー：'+e.message); }
+    }
+
+    function populateMonths(){
+      const monthsWithCase={};
+      allCases.forEach(c=>(c.dates||[]).forEach(d=>{ const ym=String(d).slice(0,7); monthsWithCase[ym]=true; }));
+      const months=Object.keys(monthsWithCase).sort().reverse();
+      const sel=document.getElementById('monthSelect');
+      sel.innerHTML='<option value="ALL">すべての月</option>'+months.map(m=>`<option value="${m}">${formatMonthJp(m)}</option>`).join('');
+      sel.value='ALL';
+    }
+
+    function applyMonthFilter(){
+      const ym=document.getElementById('monthSelect').value;
+      viewCases = (ym==='ALL') ? allCases.slice() : allCases.filter(c=>(c.dates||[]).some(d=>String(d).slice(0,7)===ym));
+      const sel=document.getElementById('caseSelect');
+      if(viewCases.length===0){ sel.innerHTML='<option>該当案件なし</option>'; currentCase=null; renderEmpty('この月の案件はありません'); document.getElementById('saveBtn').disabled=true; return; }
+      sel.innerHTML=viewCases.map((c,i)=>`<option value="${i}">${escapeHtml(c.caseName)}${c.client?'（'+escapeHtml(c.client)+'）':''}</option>`).join('');
+      sel.value=0;
+      selectCase(0);
+    }
+
+    function onMonthChange(){ applyMonthFilter(); }
+    function onCaseChange(){ selectCase(parseInt(document.getElementById('caseSelect').value)); }
+
+    function selectCase(index){
+      currentCase=viewCases[index];
+      if(!currentCase) return;
+      slotMap={};
+      (currentCase.slots||[]).forEach(s=>{ slotMap[`${s.pos}__${s.date}`]=s; });
+      setSeq=0;
+      assignedCache=[];
+      renderCase();
+      loadAssignedFor(currentCase.caseName);
+    }
+
+    // ===== 画面描画 =====
+    function renderEmpty(msg){
+      document.getElementById('wrap').innerHTML=`<div class="empty" id="emptyState">${escapeHtml(msg)}</div>`;
+    }
+
+    function renderCase(){
+      const c=currentCase;
+      const period=displayDateRange(c.dates||[]);
+      const posPills=(c.positions||[]).map(p=>`<span class="pos-pill">${escapeHtml(p)}</span>`).join('') || '<span class="muted-line">ポジション情報なし</span>';
+
+      const html=`
+        <section class="card">
+          <div class="card-head"><h2>案件情報</h2><span class="pos-pill">読込専用</span></div>
+          <div class="card-body">
+            <div class="meta-grid">
+              <div class="meta-item full"><div class="meta-label">案件名</div><div class="meta-value">${escapeHtml(c.caseName)}</div></div>
+              <div class="meta-item"><div class="meta-label">クライアント</div><div class="meta-value">${escapeHtml(c.client||'—')}</div></div>
+              <div class="meta-item"><div class="meta-label">期間</div><div class="meta-value">${escapeHtml(period)}</div></div>
+              <div class="meta-item full"><div class="meta-label">募集ポジション</div><div class="pos-pills">${posPills}</div></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card-head"><h2>この案件の割当済み</h2><span class="pos-pill" id="assignedCount">…</span></div>
+          <div class="card-body"><div id="assignedList"><div class="muted-line">読み込み中...</div></div></div>
+        </section>
+
+        <section class="card">
+          <div class="card-head"><h2>新規割当</h2></div>
+          <div class="card-body">
+            <div id="sets"></div>
+            <button type="button" class="add-set-btn" onclick="addSet()">＋ 割当セットを追加</button>
+          </div>
+        </section>
+      `;
+      document.getElementById('wrap').innerHTML=html;
+      document.getElementById('sets').innerHTML='';
+      addSet();
+      document.getElementById('saveBtn').disabled=false;
+    }
+
+    // ===== 既存割当 =====
+    async function loadAssignedFor(caseName){
+      try{
+        const res=await fetch(GAS_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},redirect:'follow',body:JSON.stringify({action:'getAssignmentsForCase',caseName:caseName})});
+        const data=await res.json();
+        assignedCache=(data&&data.assignments)||[];
+        const box=document.getElementById('assignedList');
+        const badge=document.getElementById('assignedCount');
+        if(!box) return;
+        badge.textContent=`${assignedCache.length}名`;
+        if(assignedCache.length===0){ box.className=''; box.innerHTML='<div class="muted-line">まだ割当はありません</div>'; return; }
+        box.className='assigned-list';
+        box.innerHTML=assignedCache.map(a=>{
+          const price=Number(a.unitPrice||0)>0?` ・ ¥${withComma(a.unitPrice)}`:'';
+          return `
+          <div class="assigned-row">
+            <span class="assigned-pos">${escapeHtml(a.pos)}</span>
+            <div class="assigned-meta">
+              <div class="assigned-name">${escapeHtml(a.staffName)}</div>
+              <div class="assigned-sub">${escapeHtml(formatDateShort(a.date))}${price}${a.status?' ・ '+escapeHtml(a.status):''}</div>
+            </div>
+            <button type="button" class="edit-btn" title="編集" onclick="openEditModal('${escapeHtml(a.workId)}')">✎</button>
+            <button type="button" class="del-btn" title="削除" onclick="deleteAssignment('${escapeHtml(a.workId)}','${escapeHtml(a.staffName)}')">🗑</button>
+          </div>`;
+        }).join('');
+      }catch(e){ console.error('assigned load error',e); const box=document.getElementById('assignedList'); if(box) box.innerHTML='<div class="muted-line">既存割当の取得に失敗しました</div>'; }
+    }
+
+    async function deleteAssignment(workId,name){
+      if(!confirm(`${name||'この割当'} を削除します。\nよろしいですか？`)) return;
+      try{
+        showLoading(true);
+        const res=await fetch(GAS_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},redirect:'follow',body:JSON.stringify({action:'deleteAssignment',workId:workId})});
+        const data=await res.json();
+        showLoading(false);
+        if(data.success){ showMessage('🗑 削除しました',false); loadAssignedFor(currentCase.caseName); }
+        else{ showMessage('削除失敗：'+(data.error||'不明'),true); }
+      }catch(e){ showLoading(false); showMessage('削除エラー：'+e.message,true); }
+    }
+
+    // ===== 割当編集モーダル =====
+    let editTarget=null;      // 編集中の割当（assignedCacheの要素）
+    let editSelectedDate='';  // モーダル内で選択中の日付（1つ）
+
+    function setupEditModal(){
+      document.getElementById('editClose').onclick=closeEditModal;
+      document.getElementById('editCancel').onclick=closeEditModal;
+      document.getElementById('editBackdrop').onclick=(e)=>{ if(e.target===document.getElementById('editBackdrop')) closeEditModal(); };
+      document.getElementById('editPos').onchange=()=>{ renderEditDates(); updateEditPreview(); };
+      document.getElementById('editName').oninput=updateEditPreview;
+      document.getElementById('editConfirm').onclick=confirmEdit;
+      document.addEventListener('keydown',(e)=>{ if(e.key==='Escape') closeEditModal(); });
+    }
+
+    function openEditModal(workId){
+      editTarget=assignedCache.find(a=>a.workId===workId);
+      if(!editTarget||!currentCase){ showMessage('対象が見つかりません',true); return; }
+      const positions=currentCase.positions||[];
+      const posSel=document.getElementById('editPos');
+      posSel.innerHTML=positions.map(p=>`<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('');
+      // 現在のポジションが案件に存在すれば初期選択
+      posSel.value=positions.includes(editTarget.pos)?editTarget.pos:(positions[0]||'');
+      editSelectedDate=editTarget.date||'';
+      document.getElementById('editName').value=editTarget.staffName||'';
+      renderEditDates();
+      updateEditPreview();
+      document.getElementById('editBackdrop').classList.add('show');
+    }
+
+    function closeEditModal(){
+      document.getElementById('editBackdrop').classList.remove('show');
+      editTarget=null; editSelectedDate='';
+    }
+
+    function getDatesForPos(pos){
+      const dates=(currentCase.slots||[]).filter(s=>s.pos===pos).map(s=>s.date);
+      return [...new Set(dates)].sort();
+    }
+
+    function renderEditDates(){
+      const pos=document.getElementById('editPos').value;
+      const dates=getDatesForPos(pos);
+      // ポジション変更で現在の日付が対象外になったら選択解除
+      if(!dates.includes(editSelectedDate)) editSelectedDate=dates.includes(editTarget&&editTarget.date)?editTarget.date:'';
+      const box=document.getElementById('editDates');
+      if(dates.length===0){ box.innerHTML='<span class="date-chip none">対象日なし</span>'; return; }
+      box.innerHTML=dates.map(d=>`<button type="button" class="date-chip${editSelectedDate===d?' on':''}" data-date="${d}">${escapeHtml(formatDateShort(d))}</button>`).join('');
+      box.querySelectorAll('.date-chip').forEach(chip=>{
+        chip.onclick=()=>{ editSelectedDate=chip.dataset.date; renderEditDates(); updateEditPreview(); };
+      });
+    }
+
+    function updateEditPreview(){
+      const pos=document.getElementById('editPos').value;
+      const name=document.getElementById('editName').value.trim();
+      const el=document.getElementById('editPreview');
+      if(!editSelectedDate){ el.textContent='日付を選択してください'; return; }
+      const slot=slotMap[`${pos}__${editSelectedDate}`];
+      const price=slot?` ・ 入り単価 ¥${withComma(slot.unitPrice||0)}`:'';
+      const time=slot&&slot.start?` ・ ${slot.start}〜${slot.end}`:'';
+      el.textContent=`${name||'（名前未入力）'} ・ ${pos} ・ ${formatDateShort(editSelectedDate)}${time}${price}`;
+    }
+
+    async function confirmEdit(){
+      if(!editTarget){ return; }
+      const pos=document.getElementById('editPos').value;
+      const name=document.getElementById('editName').value.trim();
+      if(!name){ showMessage('スタッフ名を入力してください',true); return; }
+      if(!editSelectedDate){ showMessage('日付を選択してください',true); return; }
+      const slot=slotMap[`${pos}__${editSelectedDate}`]||{};
+      const payload={
+        action:'updateAssignment',
+        workId:editTarget.workId,
+        staffName:name,
+        date:editSelectedDate,
+        pos:pos,
+        unitPrice:slot.unitPrice||0,
+        transport:slot.transport||0,
+        meal:slot.meal||0,
+        start:slot.start||'',
+        end:slot.end||''
+      };
+      try{
+        showLoading(true);
+        const res=await fetch(GAS_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},redirect:'follow',body:JSON.stringify(payload)});
+        const data=await res.json();
+        showLoading(false);
+        if(data.success){ showMessage('✅ 更新しました',false); closeEditModal(); loadAssignedFor(currentCase.caseName); }
+        else{ showMessage('更新失敗：'+(data.error||'不明'),true); }
+      }catch(e){ showLoading(false); showMessage('更新エラー：'+e.message,true); }
+    }
+
+    // ===== 割当セット（新規） =====
+    function addSet(){
+      const c=currentCase; if(!c) return;
+      const id='set_'+(++setSeq);
+      const positions=c.positions||[];
+      const posOptions=positions.map(p=>`<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('');
+      const card=document.createElement('div');
+      card.className='set-card';
+      card.id=id;
+      card.dataset.selectedDates='';
+      card.innerHTML=`
+        <div class="set-head">
+          <span class="set-title">割当セット</span>
+          <button type="button" class="set-remove" onclick="removeSet('${id}')">削除</button>
+        </div>
+        <div class="field">
+          <span class="f-label">ポジション</span>
+          <select class="set-sel set-pos" onchange="onSetPosChange('${id}')">${posOptions}</select>
+        </div>
+        <div class="field">
+          <span class="f-label">日付（複数選択可・1人につき1日=1行で登録されます）</span>
+          <div class="date-chips set-dates"></div>
+          <div class="chip-tools">
+            <button type="button" class="chip-tool" onclick="selectAllDates('${id}')">全日選択</button>
+            <button type="button" class="chip-tool" onclick="clearDates('${id}')">全解除</button>
+          </div>
+          <div class="set-count set-count-label"></div>
+        </div>
+        <div class="field">
+          <span class="f-label">スタッフ名</span>
+          <input type="text" class="set-input set-name" placeholder="例：田中" autocomplete="off">
+        </div>
+      `;
+      document.getElementById('sets').appendChild(card);
+      renderSetDates(id);
+    }
+
+    function removeSet(id){
+      const el=document.getElementById(id);
+      if(el) el.remove();
+      if(document.querySelectorAll('#sets .set-card').length===0) addSet();
+    }
+
+    function renderSetDates(id){
+      const card=document.getElementById(id); if(!card) return;
+      const pos=card.querySelector('.set-pos').value;
+      const dates=getDatesForPos(pos);
+      const selected=new Set((card.dataset.selectedDates||'').split(',').filter(Boolean));
+      [...selected].forEach(d=>{ if(!dates.includes(d)) selected.delete(d); });
+      card.dataset.selectedDates=[...selected].join(',');
+      const box=card.querySelector('.set-dates');
+      if(dates.length===0){ box.innerHTML='<span class="date-chip none">対象日なし</span>'; updateSetCount(id); return; }
+      box.innerHTML=dates.map(d=>`<button type="button" class="date-chip${selected.has(d)?' on':''}" data-date="${d}" onclick="toggleDate('${id}','${d}')">${escapeHtml(formatDateShort(d))}</button>`).join('');
+      updateSetCount(id);
+    }
+
+    function toggleDate(id,date){
+      const card=document.getElementById(id); if(!card) return;
+      const selected=new Set((card.dataset.selectedDates||'').split(',').filter(Boolean));
+      if(selected.has(date)) selected.delete(date); else selected.add(date);
+      card.dataset.selectedDates=[...selected].join(',');
+      const chip=card.querySelector(`.date-chip[data-date="${date}"]`);
+      if(chip) chip.classList.toggle('on',selected.has(date));
+      updateSetCount(id);
+    }
+
+    function selectAllDates(id){
+      const card=document.getElementById(id); if(!card) return;
+      const pos=card.querySelector('.set-pos').value;
+      card.dataset.selectedDates=getDatesForPos(pos).join(',');
+      renderSetDates(id);
+    }
+    function clearDates(id){
+      const card=document.getElementById(id); if(!card) return;
+      card.dataset.selectedDates='';
+      renderSetDates(id);
+    }
+    function onSetPosChange(id){ renderSetDates(id); }
+
+    function updateSetCount(id){
+      const card=document.getElementById(id); if(!card) return;
+      const n=(card.dataset.selectedDates||'').split(',').filter(Boolean).length;
+      const label=card.querySelector('.set-count-label');
+      const pos=card.querySelector('.set-pos').value;
+      const sel=(card.dataset.selectedDates||'').split(',').filter(Boolean);
+      let priceNote='';
+      if(sel.length>0){
+        const prices=[...new Set(sel.map(d=>{ const s=slotMap[`${pos}__${d}`]; return s?Number(s.unitPrice||0):0; }))];
+        priceNote = prices.length===1 ? ` ・ 入り単価 ¥${withComma(prices[0])}` : ' ・ 入り単価は日により変動';
+      }
+      label.textContent = n>0 ? `→ ${n}行を作成${priceNote}` : '日付を選択してください';
+    }
+
+    // ===== 保存（新規割当） =====
+    async function saveAll(){
+      if(!currentCase){ showMessage('案件を選んでください',true); return; }
+      const cards=[...document.querySelectorAll('#sets .set-card')];
+      const assignments=[];
+      let setsWithName=0;
+      for(const card of cards){
+        const pos=card.querySelector('.set-pos').value;
+        const name=card.querySelector('.set-name').value.trim();
+        const dates=(card.dataset.selectedDates||'').split(',').filter(Boolean);
+        if(!name && dates.length===0) continue;
+        if(!name){ showMessage('名前が未入力のセットがあります',true); return; }
+        if(dates.length===0){ showMessage(`「${name}」の日付が未選択です`,true); return; }
+        setsWithName++;
+        dates.forEach(d=>{
+          const slot=slotMap[`${pos}__${d}`]||{};
+          assignments.push({
+            projectId: slot.projectId||currentCase.projectId||'',
+            caseName: currentCase.caseName,
+            date: d,
+            pos: pos,
+            staffName: name,
+            unitPrice: slot.unitPrice||0,
+            transport: slot.transport||0,
+            meal: slot.meal||0,
+            start: slot.start||'',
+            end: slot.end||''
+          });
+        });
+      }
+      if(assignments.length===0){ showMessage('登録できる割当がありません',true); return; }
+      if(!confirm(`${setsWithName}名 / 合計 ${assignments.length} 行を B_稼働予定 に登録します。\nよろしいですか？`)) return;
+
+      try{
+        showLoading(true);
+        const res=await fetch(GAS_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},redirect:'follow',body:JSON.stringify({action:'saveAssignments',assignments:assignments})});
+        const data=await res.json();
+        showLoading(false);
+        if(data.success){
+          showMessage('✅ '+(data.message||'登録しました'),false);
+          document.getElementById('sets').innerHTML=''; setSeq=0; addSet();
+          loadAssignedFor(currentCase.caseName);
+        }else{
+          showMessage('❌ 保存失敗：'+(data.error||'不明'),true);
+        }
+      }catch(e){ showLoading(false); showMessage('保存エラー：'+e.message,true); }
+    }
+
+    window.onload=initLiff;
+  </script>
+</body>
+</html>
