@@ -56,6 +56,12 @@
     .pos-pill { font-size: 11px; font-weight: 900; color: var(--main); background: var(--soft);
       border: 1px solid var(--soft-border); border-radius: 999px; padding: 3px 9px; }
 
+    .sort-bar { display: flex; align-items: center; gap: 6px; margin-bottom: 9px; }
+    .sort-label { font-size: 11px; font-weight: 900; color: var(--muted); white-space: nowrap; }
+    .sort-seg { display: inline-flex; background: #F1F5F9; border: 1px solid var(--line); border-radius: 9px; padding: 2px; gap: 2px; }
+    .sort-btn { border: 0; background: transparent; color: #475569; border-radius: 7px;
+      padding: 6px 12px; font-size: 12px; font-weight: 900; cursor: pointer; }
+    .sort-btn.on { background: var(--main); color: #fff; box-shadow: 0 1px 4px rgba(15,110,86,0.28); }
     .assigned-list { display: grid; gap: 6px; }
     .assigned-row { display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 7px;
       background: #fff; border: 1px solid var(--line); border-radius: 9px; padding: 7px 9px; }
@@ -226,6 +232,7 @@
     let slotMap = {};       // `${pos}__${date}` -> slot（単価等の既定値）
     let setSeq = 0;         // 割当セットの連番
     let assignedCache = []; // 表示中案件の既存割当（編集用）
+    let assignedSort = 'date'; // 並び替え基準: 'pos' | 'name' | 'date'（既定=日付昇順）
 
     // ===== 日付ユーティリティ =====
     function toDate(key){ if(!key) return null; const s=String(key).slice(0,10); const [y,m,d]=s.split('-').map(Number); if(!y||!m||!d) return null; return new Date(y,m-1,d); }
@@ -326,7 +333,17 @@
 
         <section class="card">
           <div class="card-head"><h2>この案件の割当済み</h2><span class="pos-pill" id="assignedCount">…</span></div>
-          <div class="card-body"><div id="assignedList"><div class="muted-line">読み込み中...</div></div></div>
+          <div class="card-body">
+            <div class="sort-bar" id="sortBar" style="display:none;">
+              <span class="sort-label">並び替え</span>
+              <div class="sort-seg">
+                <button type="button" class="sort-btn" data-sort="pos" onclick="setAssignedSort('pos')">ポジション</button>
+                <button type="button" class="sort-btn" data-sort="name" onclick="setAssignedSort('name')">名前</button>
+                <button type="button" class="sort-btn on" data-sort="date" onclick="setAssignedSort('date')">日付</button>
+              </div>
+            </div>
+            <div id="assignedList"><div class="muted-line">読み込み中...</div></div>
+          </div>
         </section>
 
         <section class="card">
@@ -349,26 +366,60 @@
         const res=await fetch(GAS_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},redirect:'follow',body:JSON.stringify({action:'getAssignmentsForCase',caseName:caseName})});
         const data=await res.json();
         assignedCache=(data&&data.assignments)||[];
-        const box=document.getElementById('assignedList');
-        const badge=document.getElementById('assignedCount');
-        if(!box) return;
-        badge.textContent=`${assignedCache.length}名`;
-        if(assignedCache.length===0){ box.className=''; box.innerHTML='<div class="muted-line">まだ割当はありません</div>'; return; }
-        box.className='assigned-list';
-        box.innerHTML=assignedCache.map(a=>{
-          const price=Number(a.unitPrice||0)>0?` ・ ¥${withComma(a.unitPrice)}`:'';
-          return `
-          <div class="assigned-row">
-            <span class="assigned-pos">${escapeHtml(a.pos)}</span>
-            <div class="assigned-meta">
-              <div class="assigned-name">${escapeHtml(a.staffName)}</div>
-              <div class="assigned-sub">${escapeHtml(formatDateShort(a.date))}${price}${a.status?' ・ '+escapeHtml(a.status):''}</div>
-            </div>
-            <button type="button" class="edit-btn" title="編集" onclick="openEditModal('${escapeHtml(a.workId)}')">✎</button>
-            <button type="button" class="del-btn" title="削除" onclick="deleteAssignment('${escapeHtml(a.workId)}','${escapeHtml(a.staffName)}')">🗑</button>
-          </div>`;
-        }).join('');
+        renderAssigned();
       }catch(e){ console.error('assigned load error',e); const box=document.getElementById('assignedList'); if(box) box.innerHTML='<div class="muted-line">既存割当の取得に失敗しました</div>'; }
+    }
+
+    // ポジションの並び順（D→AD→ST→その他）
+    const POS_ORDER={D:0,AD:1,ST:2};
+    function sortAssigned(list){
+      const arr=[...list];
+      if(assignedSort==='pos'){
+        arr.sort((a,b)=>{
+          const pa=POS_ORDER[a.pos]??99, pb=POS_ORDER[b.pos]??99;
+          if(pa!==pb) return pa-pb;
+          return String(a.date||'').localeCompare(String(b.date||'')) || String(a.staffName||'').localeCompare(String(b.staffName||''),'ja');
+        });
+      }else if(assignedSort==='name'){
+        arr.sort((a,b)=> String(a.staffName||'').localeCompare(String(b.staffName||''),'ja') || String(a.date||'').localeCompare(String(b.date||'')));
+      }else{ // date（既定）
+        arr.sort((a,b)=> String(a.date||'').localeCompare(String(b.date||'')) || ((POS_ORDER[a.pos]??99)-(POS_ORDER[b.pos]??99)) || String(a.staffName||'').localeCompare(String(b.staffName||''),'ja'));
+      }
+      return arr;
+    }
+
+    function setAssignedSort(key){
+      assignedSort=key;
+      document.querySelectorAll('#sortBar .sort-btn').forEach(b=>b.classList.toggle('on', b.dataset.sort===key));
+      renderAssigned();
+    }
+
+    function renderAssigned(){
+      const box=document.getElementById('assignedList');
+      const badge=document.getElementById('assignedCount');
+      if(!box) return;
+      if(badge) badge.textContent=`${assignedCache.length}名`;
+      const bar=document.getElementById('sortBar');
+      if(assignedCache.length===0){
+        if(bar) bar.style.display='none';
+        box.className=''; box.innerHTML='<div class="muted-line">まだ割当はありません</div>'; return;
+      }
+      if(bar) bar.style.display='flex';
+      box.className='assigned-list';
+      const list=sortAssigned(assignedCache);
+      box.innerHTML=list.map(a=>{
+        const price=Number(a.unitPrice||0)>0?` ・ ¥${withComma(a.unitPrice)}`:'';
+        return `
+        <div class="assigned-row">
+          <span class="assigned-pos">${escapeHtml(a.pos)}</span>
+          <div class="assigned-meta">
+            <div class="assigned-name">${escapeHtml(a.staffName)}</div>
+            <div class="assigned-sub">${escapeHtml(formatDateShort(a.date))}${price}${a.status?' ・ '+escapeHtml(a.status):''}</div>
+          </div>
+          <button type="button" class="edit-btn" title="編集" onclick="openEditModal('${escapeHtml(a.workId)}')">✎</button>
+          <button type="button" class="del-btn" title="削除" onclick="deleteAssignment('${escapeHtml(a.workId)}','${escapeHtml(a.staffName)}')">🗑</button>
+        </div>`;
+      }).join('');
     }
 
     async function deleteAssignment(workId,name){
